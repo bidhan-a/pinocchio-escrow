@@ -15,6 +15,7 @@ use crate::{
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MakeIxData {
+    pub deposit_amount: u64,
     pub receive_amount: u64,
     pub bump: u8,
 }
@@ -34,7 +35,7 @@ pub fn process_make(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    let ix_data = load_ix_data::<MakeIxData>(data)?;
+    let ix_data = unsafe { load_ix_data::<MakeIxData>(data) }?;
 
     // Validate escrow account.
     let escrow_pda = pubkey::create_program_address(
@@ -77,7 +78,7 @@ pub fn process_make(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         from: maker_ata_a,
         to: vault,
         authority: maker,
-        amount: ix_data.receive_amount,
+        amount: ix_data.deposit_amount,
     }
     .invoke()?;
 

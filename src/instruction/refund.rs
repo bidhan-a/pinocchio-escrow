@@ -8,7 +8,7 @@ use pinocchio_token::state::TokenAccount;
 
 use crate::{
     constants::ESCROW_SEED,
-    state::{load_acc_mut_unchecked, Escrow},
+    state::{load_acc_mut, Escrow},
 };
 
 pub fn process_refund(accounts: &[AccountInfo]) -> ProgramResult {
@@ -23,10 +23,17 @@ pub fn process_refund(accounts: &[AccountInfo]) -> ProgramResult {
     }
 
     // Load accounts.
-    let escrow_account =
-        unsafe { load_acc_mut_unchecked::<Escrow>(escrow.borrow_mut_data_unchecked())? };
-    let vault_account = pinocchio_token::state::TokenAccount::from_account_info(vault)?;
+    let escrow_account = unsafe { load_acc_mut::<Escrow>(escrow.borrow_mut_data_unchecked())? };
 
+    assert_eq!(escrow_account.mint_a, *mint_a.key());
+    assert_eq!(escrow_account.mint_b, *mint_b.key());
+
+    // Get transfer amount.
+    let transfer_amount;
+    {
+        let vault_account = pinocchio_token::state::TokenAccount::from_account_info(vault)?;
+        transfer_amount = vault_account.amount();
+    }
     // Validate escrow account.
     let escrow_pda = pubkey::create_program_address(
         &[
@@ -61,7 +68,7 @@ pub fn process_refund(accounts: &[AccountInfo]) -> ProgramResult {
         from: vault,
         to: maker_ata_a,
         authority: escrow,
-        amount: vault_account.amount(),
+        amount: transfer_amount,
     }
     .invoke_signed(&[seeds.clone()])?;
 

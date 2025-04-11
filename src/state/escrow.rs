@@ -1,16 +1,10 @@
-use super::utils::{load_acc_mut_unchecked, DataLen, Initialized};
-use pinocchio::{
-    account_info::AccountInfo,
-    program_error::ProgramError,
-    pubkey::{self, Pubkey},
-    ProgramResult,
-};
-
-use crate::error::MyProgramError;
+use super::utils::{DataLen, Initialized};
+use pinocchio::{account_info::AccountInfo, pubkey::Pubkey};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Escrow {
+    pub is_initialized: bool,
     pub maker: Pubkey,
     pub mint_a: Pubkey,
     pub mint_b: Pubkey,
@@ -20,6 +14,12 @@ pub struct Escrow {
 
 impl DataLen for Escrow {
     const LEN: usize = core::mem::size_of::<Escrow>();
+}
+
+impl Initialized for Escrow {
+    fn is_initialized(&self) -> bool {
+        self.is_initialized
+    }
 }
 
 impl Escrow {
@@ -34,6 +34,7 @@ impl Escrow {
         let escrow =
             unsafe { &mut *(escrow_account.borrow_mut_data_unchecked().as_ptr() as *mut Self) };
 
+        escrow.is_initialized = true;
         escrow.maker = maker;
         escrow.mint_a = mint_a;
         escrow.mint_b = mint_b;

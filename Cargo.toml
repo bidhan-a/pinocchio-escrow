@@ -1,5 +1,5 @@
 [package]
-name = "solana-pinocchio-starter"
+name = "pinocchio-escrow"
 version = "0.1.0"
 edition = "2021"
 
