@@ -1,3 +1,4 @@
+use bytemuck::{Pod, Zeroable};
 use pinocchio::{
     account_info::AccountInfo,
     program_error::ProgramError,
@@ -7,21 +8,18 @@ use pinocchio::{
 };
 use pinocchio_token::state::TokenAccount;
 
-use crate::{
-    constants::ESCROW_SEED,
-    state::{load_ix_data, DataLen, Escrow},
-};
+use crate::{constants::ESCROW_SEED, error::MyProgramError, state::Escrow};
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Pod, Zeroable)]
 pub struct MakeIxData {
     pub deposit_amount: u64,
     pub receive_amount: u64,
-    pub bump: u8,
+    pub bump: u64,
 }
 
-impl DataLen for MakeIxData {
-    const LEN: usize = core::mem::size_of::<MakeIxData>();
+impl MakeIxData {
+    pub const LEN: usize = core::mem::size_of::<MakeIxData>();
 }
 
 pub fn process_make(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
@@ -35,14 +33,18 @@ pub fn process_make(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    let ix_data = unsafe { load_ix_data::<MakeIxData>(data) }?;
+    // Make sure the instruction data is properly aligned in memory.
+    let mut aligned_data = [0u8; MakeIxData::LEN];
+    aligned_data.copy_from_slice(data);
+    let ix_data = bytemuck::try_from_bytes::<MakeIxData>(&aligned_data)
+        .map_err(|_| MyProgramError::InvalidInstructionData)?;
 
     // Validate escrow account.
     let escrow_pda = pubkey::create_program_address(
         &[
             ESCROW_SEED.as_bytes(),
             maker.key().as_ref(),
-            &[ix_data.bump],
+            &[ix_data.bump as u8],
         ],
         &crate::ID,
     )?;
@@ -70,8 +72,8 @@ pub fn process_make(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         *mint_a.key(),
         *mint_b.key(),
         ix_data.receive_amount,
-        ix_data.bump,
-    );
+        ix_data.bump as u8,
+    )?;
 
     // Transfer tokens to vault.
     pinocchio_token::instructions::Transfer {

@@ -6,10 +6,7 @@ use pinocchio::{
 };
 use pinocchio_token::state::TokenAccount;
 
-use crate::{
-    constants::ESCROW_SEED,
-    state::{load_acc_mut, Escrow},
-};
+use crate::{constants::ESCROW_SEED, state::Escrow};
 
 pub fn process_take(accounts: &[AccountInfo]) -> ProgramResult {
     let [taker, maker, mint_a, mint_b, taker_ata_a, taker_ata_b, maker_ata_b, vault, escrow, _system_program, _token_program] =
@@ -22,9 +19,7 @@ pub fn process_take(accounts: &[AccountInfo]) -> ProgramResult {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    // Load accounts.
-    let escrow_account = unsafe { load_acc_mut::<Escrow>(escrow.borrow_mut_data_unchecked())? };
-
+    let escrow_account = Escrow::load(escrow)?;
     assert_eq!(escrow_account.mint_a, *mint_a.key());
     assert_eq!(escrow_account.mint_b, *mint_b.key());
 
@@ -40,7 +35,7 @@ pub fn process_take(accounts: &[AccountInfo]) -> ProgramResult {
         &[
             ESCROW_SEED.as_bytes(),
             maker.key().as_ref(),
-            &[escrow_account.bump],
+            &[escrow_account.bump as u8],
         ],
         &crate::ID,
     )?;
@@ -66,7 +61,7 @@ pub fn process_take(accounts: &[AccountInfo]) -> ProgramResult {
     .invoke()?;
 
     // Transfer token from vault to taker.
-    let bump = [escrow_account.bump];
+    let bump = [escrow_account.bump as u8];
     let seed = [
         Seed::from(b"escrow"),
         Seed::from(maker.key()),

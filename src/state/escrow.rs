@@ -1,28 +1,30 @@
-use super::utils::{DataLen, Initialized};
-use pinocchio::{account_info::AccountInfo, pubkey::Pubkey};
+use bytemuck::{Pod, Zeroable};
+use pinocchio::{
+    account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey, ProgramResult,
+};
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Pod, Zeroable)]
 pub struct Escrow {
-    pub is_initialized: bool,
     pub maker: Pubkey,
     pub mint_a: Pubkey,
     pub mint_b: Pubkey,
     pub receive_amount: u64,
-    pub bump: u8,
-}
-
-impl DataLen for Escrow {
-    const LEN: usize = core::mem::size_of::<Escrow>();
-}
-
-impl Initialized for Escrow {
-    fn is_initialized(&self) -> bool {
-        self.is_initialized
-    }
+    pub bump: u64,
 }
 
 impl Escrow {
+    pub const LEN: usize = core::mem::size_of::<Escrow>();
+
+    pub fn load(escrow_account: &AccountInfo) -> Result<Self, ProgramError> {
+        let mut data = escrow_account
+            .try_borrow_mut_data()
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+        let escrow_state = *bytemuck::try_from_bytes_mut::<Escrow>(&mut data)
+            .map_err(|_| ProgramError::AccountBorrowFailed)?;
+        Ok(escrow_state)
+    }
+
     pub fn initialize(
         escrow_account: &AccountInfo,
         maker: Pubkey,
@@ -30,15 +32,15 @@ impl Escrow {
         mint_b: Pubkey,
         receive_amount: u64,
         bump: u8,
-    ) {
-        let escrow =
-            unsafe { &mut *(escrow_account.borrow_mut_data_unchecked().as_ptr() as *mut Self) };
+    ) -> ProgramResult {
+        let mut escrow_state = Self::load(escrow_account)?;
 
-        escrow.is_initialized = true;
-        escrow.maker = maker;
-        escrow.mint_a = mint_a;
-        escrow.mint_b = mint_b;
-        escrow.receive_amount = receive_amount;
-        escrow.bump = bump;
+        escrow_state.maker = maker;
+        escrow_state.mint_a = mint_a;
+        escrow_state.mint_b = mint_b;
+        escrow_state.receive_amount = receive_amount;
+        escrow_state.bump = bump as u64;
+
+        Ok(())
     }
 }

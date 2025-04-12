@@ -26,7 +26,7 @@ fn process_instruction(
     match MyProgramInstruction::try_from(ix_disc)? {
         MyProgramInstruction::Make => {
             log!("Ix:0");
-            instruction::process_make(accounts, instruction_data)
+            instruction::process_make(accounts, &instruction_data)
         }
         MyProgramInstruction::Take => {
             log!("Ix:1");

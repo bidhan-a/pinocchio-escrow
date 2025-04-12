@@ -1,7 +1,7 @@
 use mollusk_svm::result::Check;
 use mollusk_svm::{program, Mollusk};
 use pinocchio_escrow::instruction::MakeIxData;
-use pinocchio_escrow::state::{to_bytes, DataLen, Escrow};
+use pinocchio_escrow::state::Escrow;
 use solana_sdk::account::Account;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
@@ -35,6 +35,7 @@ pub fn mollusk() -> Mollusk {
 }
 
 #[test]
+
 fn test_make() {
     let mollusk = mollusk();
 
@@ -147,14 +148,14 @@ fn test_make() {
     let ix_data = MakeIxData {
         deposit_amount: DEPOSIT_AMOUNT,
         receive_amount: RECEIVE_AMOUNT,
-        bump: escrow_bump,
+        bump: escrow_bump as u64,
     };
 
     // Ix discriminator = 0
     let mut ser_ix_data = vec![0];
 
     // Serialize the instruction data
-    ser_ix_data.extend_from_slice(unsafe { to_bytes(&ix_data) });
+    ser_ix_data.extend_from_slice(bytemuck::bytes_of(&ix_data));
 
     let instruction = Instruction::new_with_bytes(
         PROGRAM,
@@ -351,15 +352,20 @@ fn test_take() {
         Escrow::LEN,
         &PROGRAM.into(),
     );
+    // AccountInfo::
+
     let escrow_state = Escrow {
-        is_initialized: true,
         maker: *maker.as_array(),
         mint_a: *mint_x.as_array(),
         mint_b: *mint_y.as_array(),
         receive_amount: RECEIVE_AMOUNT,
-        bump: escrow_bump,
+        bump: escrow_bump as u64,
     };
-    escrow_account.data = unsafe { to_bytes(&escrow_state).to_vec() };
+    escrow_account.data = bytemuck::bytes_of(&escrow_state).to_vec();
+    // escrow_account.data = unsafe { to_bytes(&escrow_state).to_vec() };
+
+    // let escrow_state = Escrow::load(escrow_account).unwrap();
+    // escrow_state.clone_from(&test_escrow_state);
 
     // Create the instruction data
     // Ix discriminator = 1
@@ -516,14 +522,13 @@ fn test_refund() {
         &PROGRAM.into(),
     );
     let escrow_state = Escrow {
-        is_initialized: true,
         maker: *maker.as_array(),
         mint_a: *mint_x.as_array(),
         mint_b: *mint_y.as_array(),
         receive_amount: RECEIVE_AMOUNT,
-        bump: escrow_bump,
+        bump: escrow_bump as u64,
     };
-    escrow_account.data = unsafe { to_bytes(&escrow_state).to_vec() };
+    escrow_account.data = bytemuck::bytes_of(&escrow_state).to_vec();
 
     // Create the instruction data
     // Ix discriminator = 2
